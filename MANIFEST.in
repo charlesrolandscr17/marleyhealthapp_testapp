@@ -1,0 +1,18 @@
+include MANIFEST.in
+include requirements.txt
+include *.json
+include *.md
+include *.py
+include *.txt
+recursive-include marley_healthcare_app *.css
+recursive-include marley_healthcare_app *.csv
+recursive-include marley_healthcare_app *.html
+recursive-include marley_healthcare_app *.ico
+recursive-include marley_healthcare_app *.js
+recursive-include marley_healthcare_app *.json
+recursive-include marley_healthcare_app *.md
+recursive-include marley_healthcare_app *.png
+recursive-include marley_healthcare_app *.py
+recursive-include marley_healthcare_app *.svg
+recursive-include marley_healthcare_app *.txt
+recursive-exclude marley_healthcare_app *.pyc
