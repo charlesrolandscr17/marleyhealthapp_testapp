@@ -16,8 +16,12 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null; then
+# Check if Docker Compose is installed (checking both variants)
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+else
     echo "❌ Docker Compose is not installed. Please install Docker Compose first."
     exit 1
 fi
@@ -54,7 +58,7 @@ sed -i "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=$ADMIN_PASSWORD/" .env
 sed -i "s/DB_ROOT_PASSWORD=.*/DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD/" .env
 
 echo "🚀 Starting Docker services..."
-docker-compose up -d
+$DOCKER_COMPOSE up -d
 
 echo ""
 echo "⏳ Waiting for services to be ready (this may take 1-2 minutes)..."
@@ -62,22 +66,22 @@ sleep 60
 
 echo ""
 echo "🔧 Creating new site: $SITE_NAME..."
-docker-compose exec -T backend bench new-site "$SITE_NAME" \
+$DOCKER_COMPOSE exec -T backend bench new-site "$SITE_NAME" \
     --admin-password "$ADMIN_PASSWORD" \
     --db-root-password "$DB_ROOT_PASSWORD" \
     --no-mariadb-socket
 
 echo ""
 echo "📦 Installing ERPNext..."
-docker-compose exec -T backend bench --site "$SITE_NAME" install-app erpnext
+$DOCKER_COMPOSE exec -T backend bench --site "$SITE_NAME" install-app erpnext
 
 echo ""
 echo "📦 Installing Marley Healthcare App..."
-docker-compose exec -T backend bench --site "$SITE_NAME" install-app marley_healthcare_app
+$DOCKER_COMPOSE exec -T backend bench --site "$SITE_NAME" install-app marley_healthcare_app
 
 echo ""
 echo "✅ Setting $SITE_NAME as the current site..."
-docker-compose exec -T backend bench use "$SITE_NAME"
+$DOCKER_COMPOSE exec -T backend bench use "$SITE_NAME"
 
 echo ""
 echo "======================================"
@@ -90,8 +94,8 @@ echo "  Username: Administrator"
 echo "  Password: $ADMIN_PASSWORD"
 echo ""
 echo "To view logs:"
-echo "  docker-compose logs -f"
+echo "  $DOCKER_COMPOSE logs -f"
 echo ""
 echo "To stop services:"
-echo "  docker-compose down"
+echo "  $DOCKER_COMPOSE down"
 echo ""
