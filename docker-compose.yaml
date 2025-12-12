@@ -20,6 +20,7 @@ services:
       - db
       - redis-cache
       - redis-queue
+      - create-site
 
   frontend:
     image: frappe/erpnext:v15.35.0
@@ -67,6 +68,7 @@ services:
     depends_on:
       - redis-cache
       - redis-queue
+      - create-site
 
   queue-short:
     image: frappe/erpnext:v15.35.0
@@ -93,6 +95,7 @@ services:
       - db
       - redis-cache
       - redis-queue
+      - create-site
 
   queue-long:
     image: frappe/erpnext:v15.35.0
@@ -119,6 +122,7 @@ services:
       - db
       - redis-cache
       - redis-queue
+      - create-site
 
   scheduler:
     image: frappe/erpnext:v15.35.0
@@ -143,6 +147,7 @@ services:
       - db
       - redis-cache
       - redis-queue
+      - create-site
 
   db:
     image: mariadb:10.6
@@ -216,6 +221,68 @@ services:
       - db
       - redis-cache
       - redis-queue
+
+  create-site:
+    image: frappe/erpnext:v15.35.0
+    deploy:
+      restart_policy:
+        condition: none
+    entrypoint:
+      - bash
+      - -c
+    command:
+      - >
+        export MYSQL_PWD=${DB_ROOT_PASSWORD:-admin};
+        echo "Waiting for database to be ready...";
+        until mysqladmin ping -h ${DB_HOST:-db} -u root --silent; do
+          echo "Database is unavailable - sleeping";
+          sleep 2;
+        done;
+        echo "Database is ready!";
+        echo "Waiting for Redis cache to be ready...";
+        until redis-cli -h redis-cache ping > /dev/null 2>&1; do
+          echo "Redis cache is unavailable - sleeping";
+          sleep 2;
+        done;
+        echo "Redis cache is ready!";
+        echo "Waiting for Redis queue to be ready...";
+        until redis-cli -h redis-queue ping > /dev/null 2>&1; do
+          echo "Redis queue is unavailable - sleeping";
+          sleep 2;
+        done;
+        echo "Redis queue is ready!";
+        if [ ! -d "sites/${SITE_NAME:-erp.marleyhealthcare.local}" ]; then
+          echo "Creating new site: ${SITE_NAME:-erp.marleyhealthcare.local}";
+          bench new-site ${SITE_NAME:-erp.marleyhealthcare.local} --admin-password ${ADMIN_PASSWORD:-admin} --db-root-password ${DB_ROOT_PASSWORD:-admin} --no-mariadb-socket;
+          echo "Installing ERPNext...";
+          bench --site ${SITE_NAME:-erp.marleyhealthcare.local} install-app erpnext;
+          echo "Installing Marley Healthcare App...";
+          bench --site ${SITE_NAME:-erp.marleyhealthcare.local} install-app marley_healthcare_app;
+          echo "Setting site as default...";
+          bench use ${SITE_NAME:-erp.marleyhealthcare.local};
+          echo "Site creation completed successfully!";
+        else
+          echo "Site ${SITE_NAME:-erp.marleyhealthcare.local} already exists, skipping creation.";
+        fi
+    environment:
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-3306}
+      - REDIS_CACHE=redis-cache:6379
+      - REDIS_QUEUE=redis-queue:6379
+      - SITE_NAME=${SITE_NAME:-erp.marleyhealthcare.local}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-admin}
+    volumes:
+      - sites:/home/frappe/frappe-bench/sites
+      - logs:/home/frappe/frappe-bench/logs
+      - ./marley_healthcare_app:/home/frappe/frappe-bench/apps/marley_healthcare_app
+    networks:
+      - marley-network
+    depends_on:
+      - db
+      - redis-cache
+      - redis-queue
+      - configurator
 
 volumes:
   db-data:
