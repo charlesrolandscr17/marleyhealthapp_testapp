@@ -232,20 +232,28 @@ services:
       - -c
     command:
       - >
+        export MYSQL_PWD=${DB_ROOT_PASSWORD:-admin};
         echo "Waiting for database to be ready...";
-        until mysqladmin ping -h ${DB_HOST:-db} -u root -p${DB_ROOT_PASSWORD:-admin} --silent; do
+        until mysqladmin ping -h ${DB_HOST:-db} -u root --silent; do
           echo "Database is unavailable - sleeping";
           sleep 2;
         done;
         echo "Database is ready!";
-        echo "Waiting for Redis services...";
-        sleep 10;
+        echo "Waiting for Redis cache to be ready...";
+        until redis-cli -h redis-cache ping > /dev/null 2>&1; do
+          echo "Redis cache is unavailable - sleeping";
+          sleep 2;
+        done;
+        echo "Redis cache is ready!";
+        echo "Waiting for Redis queue to be ready...";
+        until redis-cli -h redis-queue ping > /dev/null 2>&1; do
+          echo "Redis queue is unavailable - sleeping";
+          sleep 2;
+        done;
+        echo "Redis queue is ready!";
         if [ ! -d "sites/${SITE_NAME:-erp.marleyhealthcare.local}" ]; then
           echo "Creating new site: ${SITE_NAME:-erp.marleyhealthcare.local}";
-          bench new-site ${SITE_NAME:-erp.marleyhealthcare.local}
-            --admin-password ${ADMIN_PASSWORD:-admin}
-            --db-root-password ${DB_ROOT_PASSWORD:-admin}
-            --no-mariadb-socket;
+          bench new-site ${SITE_NAME:-erp.marleyhealthcare.local} --admin-password ${ADMIN_PASSWORD:-admin} --db-root-password ${DB_ROOT_PASSWORD:-admin} --no-mariadb-socket;
           echo "Installing ERPNext...";
           bench --site ${SITE_NAME:-erp.marleyhealthcare.local} install-app erpnext;
           echo "Installing Marley Healthcare App...";
